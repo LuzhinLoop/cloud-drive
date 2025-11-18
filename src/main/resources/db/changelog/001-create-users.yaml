@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 000-create-users
+      author: luna
+      changes:
+        - createTable:
+            tableName: users
+            remarks: "Table of registered users"
+            columns:
+              - column:
+                  name: id
+                  type: UUID
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: users_pk
+                    nullable: false
+              - column:
+                  name: username
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: username
+            constraintName: users_username_uk
+
+      rollback:
+        - dropTable:
+            tableName: users
+            cascadeConstraints: true
