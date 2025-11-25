@@ -1,6 +1,5 @@
 package io.cloud_storage.mappers;
 
-import io.cloud_storage.domain.dto.UserDto;
 import io.cloud_storage.domain.model.User;
 import io.cloud_storage.domain.request.UserRequestDto;
 import org.mapstruct.Mapper;
