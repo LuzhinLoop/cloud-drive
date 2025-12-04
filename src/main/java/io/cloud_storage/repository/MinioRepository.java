@@ -3,8 +3,6 @@ package io.cloud_storage.repository;
 import io.cloud_storage.Exeptions.S3RepositoryException;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
-import io.minio.messages.DeleteError;
-import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Repository
@@ -22,7 +21,7 @@ public class MinioRepository implements S3Repository {
 
     private final MinioClient minioClient;
 
-    private static final long PART_SIZE = 10485760L;
+    private static final long PART_SIZE = 10485760L; // 10 Mb
 
     @Value("${minio.bucket-name}")
     private String bucketName;
@@ -37,6 +36,7 @@ public class MinioRepository implements S3Repository {
             throw new RuntimeException("Failed to check if bucket exists. Bucket name: " + bucketName, e);
         }
     }
+
 
     @Override
     public void createBucketIfNotExists() {
@@ -57,155 +57,29 @@ public class MinioRepository implements S3Repository {
     }
 
     @Override
-    public boolean objectExist(String path) {
+    public Optional<StatObjectResponse> getObject(String path) {
+
         try {
-            minioClient.statObject(
+            StatObjectResponse response = minioClient.statObject(
                     StatObjectArgs.builder()
                             .bucket(bucketName)
                             .object(path)
                             .build()
             );
-            return true;
-        } catch (ErrorResponseException e) {
-            if ("NoSuchKey".equals(e.errorResponse().code())) {
-                log.debug("Object not found: {}", path);
-                return false;
-            }
-            log.error("Minio error for path {}: {}", path, e.getMessage());
-            throw new S3RepositoryException(e);
+            return Optional.of(response);
+
         } catch (Exception e) {
-            log.error("System error checking object: {}", path, e);
-            throw new S3RepositoryException(e);
+            if (e instanceof ErrorResponseException minioEx &&
+                    "NoSuchKey".equals(minioEx.errorResponse().code())) {
+                log.debug("Object not found at path: {}", path);
+                return Optional.empty();
+            }
+            throw processException(path, e);
         }
     }
 
     @Override
-    public void saveObject(String path, String contentType, InputStream inputStream) {
-        try {
-            minioClient.putObject(PutObjectArgs
-                    .builder()
-                    .bucket(bucketName)
-                    .object(path)
-                    .stream(inputStream, -1, PART_SIZE)
-                    .contentType(contentType)
-                    .build());
-        } catch (Exception e) {
-            log.error("Failed to save object: {}", path, e);
-            throw new S3RepositoryException(e);
-        }
-    }
-
-    @Override
-    public InputStream getObject(String path) {
-        try {
-            return minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(path)
-                            .build()
-            );
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    public List<Item> listUserFiles(String prefix) {
-
-        String normalizedPrefix = prefix.endsWith("/") ? prefix : prefix + "/"; // или перенести в сервис
-
-        try {
-            List<Item> response = new ArrayList<>();
-
-            Iterable<Result<Item>> results = minioClient.listObjects(
-                    ListObjectsArgs.builder()
-                            .bucket(bucketName)
-                            .prefix(normalizedPrefix)
-                            .recursive(false)
-                            .build()
-            );
-
-            for (Result<Item> result : results) {
-                response.add(result.get());
-            }
-            return response;
-        } catch (Exception e) {
-            log.error("Error listing object for path: {}", prefix, e);
-            throw new S3RepositoryException(e);
-        }
-    }
-
-    public void copyObject(String sourcePath, String destinationPath) {
-        try {
-            minioClient.copyObject(
-                    CopyObjectArgs.builder()
-                            .bucket(bucketName)
-                            .source(CopySource.builder().bucket(bucketName).object(sourcePath).build())
-                            .object(destinationPath)
-                            .build());
-        } catch (Exception e) {
-            log.error("Error copying object from {} to {}", sourcePath, destinationPath, e);
-            throw new S3RepositoryException(e);
-        }
-    }
-
-    @Override
-    public void removeObjectOrDirectory(String path) {
-        try {
-            if (path.endsWith("/")) {
-                deleteByPrefix(path);
-            } else {
-                deleteSingleObject(path);
-            }
-        } catch (Exception e) {
-            log.error("Failed to execute removeObjectOrDirectory for path: {}", path, e);
-            throw new S3RepositoryException(e);
-        }
-    }
-
-    private void deleteByPrefix(String prefix) {
-
-        try {
-            Iterable<Result<Item>> results = minioClient
-                    .listObjects(
-                            ListObjectsArgs.builder()
-                                    .bucket(bucketName)
-                                    .prefix(prefix)
-                                    .recursive(true)
-                                    .build()
-                    );
-
-            List<DeleteObject> objectsToDelete = new ArrayList<>();
-
-            for (Result<Item> result : results) {
-                objectsToDelete.add(new DeleteObject(result.get().objectName()));
-            }
-
-            if (objectsToDelete.isEmpty()) {
-                log.info("No objects found for prefix {}, nothing to delete", prefix);
-                return;
-            }
-
-            Iterable<Result<DeleteError>> deleteResult = minioClient.removeObjects(
-                    RemoveObjectsArgs.builder()
-                            .bucket(bucketName)
-                            .objects(objectsToDelete)
-                            .build()
-            );
-
-            for (Result<DeleteError> deleteErrorResult : deleteResult) {
-                DeleteError error = deleteErrorResult.get();
-                log.error("Failed to delete object {}: {}", error.objectName(), error.message());
-            }
-            log.info("Completed bulk deletion for prefix {}", prefix);
-
-        } catch (Exception e) {
-            throw new S3RepositoryException(e);
-        }
-    }
-
-    private void deleteSingleObject(String path) {
-
+    public void deleteObject(String path) {
         try {
             minioClient.removeObject(
                     RemoveObjectArgs.builder()
@@ -214,8 +88,96 @@ public class MinioRepository implements S3Repository {
                             .build()
             );
         } catch (Exception e) {
-            log.error("Failed to delete object: {}", path, e);
-            throw new S3RepositoryException(e);
+            throw processException(path, e);
         }
     }
+
+    @Override
+    public InputStream downloadObject(String path) {
+        try {
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(path)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw processException(path, e);
+        }
+    }
+
+    @Override
+    public List<Item> listObject(String prefix, boolean recursive) {
+        try {
+            List<Item> items = new ArrayList<>();
+
+            Iterable<Result<Item>> results = minioClient.listObjects(
+                    ListObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .prefix(prefix)
+                            .recursive(recursive)
+                            .build()
+            );
+
+            for (Result<Item> result : results) {
+                items.add(result.get());
+            }
+
+            return items;
+        } catch (Exception e) {
+            throw processException(prefix, e);
+        }
+    }
+
+    @Override
+    public void uploadObject(String path, InputStream stream,
+                             long size, String contentType) {
+        try {
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(path)
+                            .stream(stream, size, PART_SIZE)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw processException(path, e);
+        }
+    }
+
+    private boolean checkObjectExist(String path) {
+        try {
+            minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(path)
+                            .build()
+            );
+            return true;
+
+        } catch (ErrorResponseException e) {
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
+                return false;
+            }
+
+            log.error("Minio error while check object for path: {}", path, e);
+            throw new S3RepositoryException("Minio error while check object for path: " + path, e);
+        } catch (Exception e) {
+            log.error("Failed to check object: {}", path, e);
+            throw new S3RepositoryException("Failed to check object: " + path, e);
+        }
+    }
+
+    private S3RepositoryException processException(String path, Exception e) {
+
+        if (e instanceof ErrorResponseException minioEx) {
+            log.error("Minio error for path {}: {} - {}", path, minioEx.errorResponse().code(), minioEx.errorResponse().message());
+        } else {
+            log.error("Unexpected error for path {}: {}", path, e.getMessage(), e);
+        }
+
+        return new S3RepositoryException("Operation failed for path: " + path, e);
+    }
+
+
 }
