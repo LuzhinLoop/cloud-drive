@@ -1,24 +1,24 @@
 package io.cloud_storage.repository;
 
+import io.minio.StatObjectResponse;
 import io.minio.messages.Item;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Optional;
 
 public interface S3Repository {
 
     void createBucketIfNotExists();
 
-    boolean objectExist(String path);
-    InputStream getObject(String path);
-    void saveObject(String path, String contentType, InputStream inputStream);
-    public void copyObject(String sourcePath, String destinationPath);
+    Optional<StatObjectResponse> getObject(String path);
 
-    List<Item> listUserFiles(String path);
-    void removeObjectOrDirectory(String path);
+    void deleteObject(String path);
 
+    InputStream downloadObject(String path);
 
-//    void createDirectory(String bucketName, String path);
+    List<Item> listObject(String prefix, boolean recursive);
 
+    void uploadObject(String path, InputStream stream, long size, String contentType);
 
 }

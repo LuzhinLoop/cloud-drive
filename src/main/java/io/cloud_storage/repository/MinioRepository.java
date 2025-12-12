@@ -1,6 +1,6 @@
 package io.cloud_storage.repository;
 
-import io.cloud_storage.Exeptions.S3RepositoryException;
+import io.cloud_storage.exceptions.StorageException;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
 import io.minio.messages.Item;
@@ -79,10 +79,10 @@ public class MinioRepository implements S3Repository {
     }
 
     @Override
-    public void deleteObject(String path) {
+    public InputStream downloadObject(String path) {
         try {
-            minioClient.removeObject(
-                    RemoveObjectArgs.builder()
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
                             .bucket(bucketName)
                             .object(path)
                             .build()
@@ -93,12 +93,14 @@ public class MinioRepository implements S3Repository {
     }
 
     @Override
-    public InputStream downloadObject(String path) {
+    public void uploadObject(String path, InputStream stream,
+                             long size, String contentType) {
         try {
-            return minioClient.getObject(
-                    GetObjectArgs.builder()
+            minioClient.putObject(
+                    PutObjectArgs.builder()
                             .bucket(bucketName)
                             .object(path)
+                            .stream(stream, size, PART_SIZE)
                             .build()
             );
         } catch (Exception e) {
@@ -129,15 +131,14 @@ public class MinioRepository implements S3Repository {
         }
     }
 
+
     @Override
-    public void uploadObject(String path, InputStream stream,
-                             long size, String contentType) {
+    public void deleteObject(String path) {
         try {
-            minioClient.putObject(
-                    PutObjectArgs.builder()
+            minioClient.removeObject(
+                    RemoveObjectArgs.builder()
                             .bucket(bucketName)
                             .object(path)
-                            .stream(stream, size, PART_SIZE)
                             .build()
             );
         } catch (Exception e) {
@@ -161,14 +162,14 @@ public class MinioRepository implements S3Repository {
             }
 
             log.error("Minio error while check object for path: {}", path, e);
-            throw new S3RepositoryException("Minio error while check object for path: " + path, e);
+            throw new StorageException("Minio error while check object for path: " + path, e);
         } catch (Exception e) {
             log.error("Failed to check object: {}", path, e);
-            throw new S3RepositoryException("Failed to check object: " + path, e);
+            throw new StorageException("Failed to check object: " + path, e);
         }
     }
 
-    private S3RepositoryException processException(String path, Exception e) {
+    private StorageException processException(String path, Exception e) {
 
         if (e instanceof ErrorResponseException minioEx) {
             log.error("Minio error for path {}: {} - {}", path, minioEx.errorResponse().code(), minioEx.errorResponse().message());
@@ -176,7 +177,7 @@ public class MinioRepository implements S3Repository {
             log.error("Unexpected error for path {}: {}", path, e.getMessage(), e);
         }
 
-        return new S3RepositoryException("Operation failed for path: " + path, e);
+        return new StorageException("Operation failed for path: " + path, e);
     }
 
 
