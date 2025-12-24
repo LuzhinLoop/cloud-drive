@@ -1,5 +1,6 @@
 package io.cloud_storage.repository;
 
+import io.cloud_storage.exceptions.ResourceNotFoundException;
 import io.cloud_storage.exceptions.StorageException;
 import io.minio.*;
 import io.minio.errors.ErrorResponseException;
@@ -57,26 +58,24 @@ public class MinioRepository implements S3Repository {
     }
 
     @Override
-    public Optional<StatObjectResponse> getObject(String path) {
-
+    public StatObjectResponse statObject(String path) {
         try {
-            StatObjectResponse response = minioClient.statObject(
+            return minioClient.statObject(
                     StatObjectArgs.builder()
                             .bucket(bucketName)
                             .object(path)
                             .build()
             );
-            return Optional.of(response);
-
-        } catch (Exception e) {
-            if (e instanceof ErrorResponseException minioEx &&
-                    "NoSuchKey".equals(minioEx.errorResponse().code())) {
-                log.debug("Object not found at path: {}", path);
-                return Optional.empty();
+        } catch (ErrorResponseException e) {
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
+                throw new ResourceNotFoundException("Resource not found: " + path);
             }
+            throw processException(path, e);
+        } catch (Exception e) {
             throw processException(path, e);
         }
     }
+
 
     @Override
     public InputStream downloadObject(String path) {
@@ -94,7 +93,7 @@ public class MinioRepository implements S3Repository {
 
     @Override
     public void uploadObject(String path, InputStream stream,
-                             long size, String contentType) {
+                             long size) {
         try {
             minioClient.putObject(
                     PutObjectArgs.builder()
@@ -131,7 +130,6 @@ public class MinioRepository implements S3Repository {
         }
     }
 
-
     @Override
     public void deleteObject(String path) {
         try {
@@ -146,7 +144,7 @@ public class MinioRepository implements S3Repository {
         }
     }
 
-    private boolean checkObjectExist(String path) {
+    public boolean checkObjectExists(String path) {
         try {
             minioClient.statObject(
                     StatObjectArgs.builder()
@@ -179,6 +177,4 @@ public class MinioRepository implements S3Repository {
 
         return new StorageException("Operation failed for path: " + path, e);
     }
-
-
 }

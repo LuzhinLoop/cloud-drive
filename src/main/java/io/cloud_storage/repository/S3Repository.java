@@ -5,13 +5,12 @@ import io.minio.messages.Item;
 
 import java.io.InputStream;
 import java.util.List;
-import java.util.Optional;
 
 public interface S3Repository {
 
     void createBucketIfNotExists();
 
-    Optional<StatObjectResponse> getObject(String path);
+    StatObjectResponse statObject(String path);
 
     void deleteObject(String path);
 
@@ -19,6 +18,6 @@ public interface S3Repository {
 
     List<Item> listObject(String prefix, boolean recursive);
 
-    void uploadObject(String path, InputStream stream, long size, String contentType);
+    void uploadObject(String path, InputStream stream, long size);
 
 }
