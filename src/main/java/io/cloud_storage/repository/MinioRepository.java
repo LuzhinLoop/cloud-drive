@@ -37,7 +37,6 @@ public class MinioRepository implements S3Repository {
         }
     }
 
-
     @Override
     public void createBucketIfNotExists() {
         try {
@@ -75,7 +74,6 @@ public class MinioRepository implements S3Repository {
         }
     }
 
-
     @Override
     public InputStream downloadObject(String path) {
         try {
@@ -109,23 +107,56 @@ public class MinioRepository implements S3Repository {
     @Override
     public List<Item> listObject(String prefix, boolean recursive) {
         try {
-            List<Item> items = new ArrayList<>();
+            log.debug("listObject called - prefix: '{}', recursive: {}", prefix, recursive);
 
-            Iterable<Result<Item>> results = minioClient.listObjects(
-                    ListObjectsArgs.builder()
+            ListObjectsArgs.Builder builder = ListObjectsArgs.builder()
+                    .bucket(bucketName)
+                    .prefix(prefix)
+                    .recursive(recursive);
+
+            if (!recursive) {
+                builder.delimiter("/");
+                log.debug("Using delimiter '/' for non-recursive listing");
+            }
+
+            List<Item> items = new ArrayList<>();
+            int counter = 0;
+            for (Result<Item> result : minioClient.listObjects(builder.build())) {
+                Item item = result.get();
+                items.add(item);
+                log.debug("Item [{}]: name='{}', isDir={}, size={}",
+                        counter++, item.objectName(), item.isDir(), item.size());
+            }
+
+            log.debug("Total items found: {}", items.size());
+            return items;
+
+        } catch (Exception e) {
+            log.error("Error in listObject with prefix: '{}', recursive: {}", prefix, recursive, e);
+            throw processException(prefix, e);
+        }
+    }
+
+    public void copyObject(String sourceKey, String targetKey) {
+        try {
+            log.debug("copyObject source='{}' -> target='{}'", sourceKey, targetKey);
+
+            minioClient.copyObject(
+                    CopyObjectArgs.builder()
                             .bucket(bucketName)
-                            .prefix(prefix)
-                            .recursive(recursive)
+                            .object(targetKey)
+                            .source(
+                                    CopySource.builder()
+                                            .bucket(bucketName)
+                                            .object(sourceKey)
+                                            .build()
+                            )
                             .build()
             );
 
-            for (Result<Item> result : results) {
-                items.add(result.get());
-            }
-
-            return items;
         } catch (Exception e) {
-            throw processException(prefix, e);
+            log.error("copyObject failed source='{}' target='{}'", sourceKey, targetKey, e);
+            throw new StorageException("Failed to copy object: " + sourceKey + " -> " + targetKey, e);
         }
     }
 
@@ -139,6 +170,7 @@ public class MinioRepository implements S3Repository {
                             .build()
             );
         } catch (Exception e) {
+            log.error("Deleted object is failed ='{}'", path, e);
             throw processException(path, e);
         }
     }
