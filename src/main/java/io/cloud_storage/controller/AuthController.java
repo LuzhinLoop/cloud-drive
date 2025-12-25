@@ -26,28 +26,47 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/sign-up")
-    public ResponseEntity<UserResponseDto> registerUser(@Valid @RequestBody UserRequestDto request) {
+    public ResponseEntity<UserResponseDto> registerUser(
+            @Valid @RequestBody UserRequestDto request,
+            HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse
+    ) {
         authService.createUser(request);
-        UserResponseDto responseDto = authService.login(request.username(), request.password());
+
+        UserResponseDto responseDto = authService.login(
+                request.username(),
+                request.password(),
+                httpServletRequest,
+                httpServletResponse
+        );
+
         return new ResponseEntity<>(responseDto, HttpStatus.CREATED);
     }
 
     @PostMapping("/sign-in")
-    public ResponseEntity<UserResponseDto> login(@Valid @RequestBody UserRequestDto userRequestDto) {
-        UserResponseDto userResponseDto = authService
-                .login(userRequestDto.username(), userRequestDto.password());
-        return ResponseEntity.ok(userResponseDto);
+    public ResponseEntity<UserResponseDto> login(
+            @Valid @RequestBody UserRequestDto request,
+            HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse
+    ) {
+        UserResponseDto response = authService.login(
+                request.username(),
+                request.password(),
+                httpServletRequest,
+                httpServletResponse
+        );
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/sign-out")
-    public ResponseEntity<Void> logout(Authentication authentication,
-                                       HttpServletRequest request,
-                                       HttpServletResponse response) {
-
+    public ResponseEntity<Void> logout(
+            Authentication authentication,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
         if (authentication != null) {
             new SecurityContextLogoutHandler().logout(request, response, authentication);
         }
-
         return ResponseEntity.noContent().build();
     }
 }

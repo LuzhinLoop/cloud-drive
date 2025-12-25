@@ -4,6 +4,8 @@ import io.cloud_storage.domain.dto.MessageDto;
 import io.cloud_storage.exceptions.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -33,6 +35,20 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public MessageDto handleBadRequestBody(HttpMessageNotReadableException e) {
         return new MessageDto("Invalid request body");
+    }
+
+    /// === 401 ===
+
+    @ExceptionHandler({ BadCredentialsException.class, AuthenticationException.class })
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public MessageDto handleAuth(AuthenticationException e) {
+        return new MessageDto("Invalid credentials");
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public MessageDto handleIllegalArgument(IllegalArgumentException e) {
+        return new MessageDto(e.getMessage());
     }
 
     /// === 404 ===
