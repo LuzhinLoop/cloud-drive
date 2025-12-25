@@ -3,6 +3,7 @@ package io.cloud_storage.controller;
 import io.cloud_storage.domain.request.UserRequestDto;
 import io.cloud_storage.domain.response.UserResponseDto;
 import io.cloud_storage.service.AuthService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Tag(name = "Auth", description = "Registration, authentication, and logout")
 @Validated
 @RestController
 @RequestMapping("/api/auth")

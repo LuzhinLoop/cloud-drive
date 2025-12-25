@@ -4,6 +4,7 @@ import io.cloud_storage.domain.model.Resourse;
 import io.cloud_storage.domain.response.ResourseResponseDto;
 import io.cloud_storage.security.DriveUserDetails;
 import io.cloud_storage.service.MinioService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+@Tag(name = "Resource", description = "File and resource operations")
 @Slf4j
 @RestController
 @RequestMapping("/api/resource")
