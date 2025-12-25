@@ -35,3 +35,10 @@ build/
 .vscode/
 
 /.mvn/
+/src/main/resources/application.properties
+/.env
+/.gitattributes
+/mvnw.cmd
+/src/test/java/io/cloud_storage/TestcontainersConfiguration.java
+/src/test/java/io/cloud_storage/TestZhukovDriveApplication.java
+/src/test/java/io/cloud_storage/ZhukovDriveApplicationTests.java
