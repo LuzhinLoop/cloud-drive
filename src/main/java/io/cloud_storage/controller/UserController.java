@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Validated
 @RestController
-@RequestMapping(path = "/user")
+@RequestMapping(path = "api/user")
 @RequiredArgsConstructor
 public class UserController {
 
@@ -18,5 +18,4 @@ public class UserController {
     public UserResponseDto getMe(Authentication authentication) {
         return new UserResponseDto(authentication.getName());
     }
-
 }

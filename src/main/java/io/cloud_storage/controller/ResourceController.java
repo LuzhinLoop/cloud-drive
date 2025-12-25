@@ -4,6 +4,8 @@ import io.cloud_storage.domain.model.Resourse;
 import io.cloud_storage.domain.response.ResourseResponseDto;
 import io.cloud_storage.security.DriveUserDetails;
 import io.cloud_storage.service.MinioService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.InputStreamResource;
@@ -19,7 +21,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/resource")
+@RequestMapping("/api/resource")
 @RequiredArgsConstructor
 public class ResourceController {
 
@@ -27,7 +29,9 @@ public class ResourceController {
 
     @GetMapping
     public ResourseResponseDto getResource(
-            @RequestParam String path,
+            @Valid
+            @RequestParam(name = "path")
+            @NotBlank(message = "Parameter \"path\" must not be blank") String path,
             @AuthenticationPrincipal DriveUserDetails principal
     ) {
         return minioService.getResource(principal.getId(), path);
@@ -35,16 +39,21 @@ public class ResourceController {
 
     @DeleteMapping
     public ResponseEntity<Void> deleteResource(
-            @RequestParam String path,
+            @Valid
+            @RequestParam(name = "path")
+            @NotBlank(message = "Parameter \"path\" must not be blank") String path,
             @AuthenticationPrincipal DriveUserDetails principal
     ) {
+
         minioService.deleteResource(principal.getId(), path);
-        return ResponseEntity.noContent().build(); // 204
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/download")
     public ResponseEntity<InputStreamResource> download(
-            @RequestParam String path,
+            @Valid
+            @RequestParam(name = "path")
+            @NotBlank(message = "Parameter \"path\" must not be blank") String path,
             @AuthenticationPrincipal DriveUserDetails principal
     ) {
         Resourse resource =
@@ -61,25 +70,32 @@ public class ResourceController {
 
     @GetMapping("/move")
     public ResourseResponseDto move(
-            @RequestParam String from,
-            @RequestParam String to,
-            @AuthenticationPrincipal DriveUserDetails principal
-    ) {
+            @Valid
+            @RequestParam(name = "from")
+            @NotBlank(message = "Parameter \"from\" must not be blank") String from,
+            @Valid
+            @RequestParam(name = "to")
+            @NotBlank(message = "Parameter \"to\" must not be blank") String to,
+            @AuthenticationPrincipal DriveUserDetails principal) {
+
         return minioService.moveResource(principal.getId(), from, to);
     }
 
     @GetMapping("/search")
     public List<ResourseResponseDto> search(
-            @RequestParam String query,
-            @AuthenticationPrincipal DriveUserDetails principal
-    ) {
+            @Valid
+            @RequestParam(name = "query")
+            @NotBlank(message = "Parameter \"query\" must not be blank")
+            String query,
+            @AuthenticationPrincipal DriveUserDetails principal) {
+
         return minioService.searchResources(principal.getId(), query);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<ResourseResponseDto>> upload(
-            @RequestParam String path,
-            @RequestPart("file") List<MultipartFile> files,
+            @RequestParam("path") String path,
+            @RequestParam("object") List<MultipartFile> files,
             @AuthenticationPrincipal DriveUserDetails principal
     ) {
         List<ResourseResponseDto> uploaded =
